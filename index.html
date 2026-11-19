@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Aerogenerador 3D</title>
+    <!-- Three.js and OrbitControls (Local offline copies) -->
+    <script src="three.min.js"></script>
+    <script src="OrbitControls.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+        :root {
+            /* Theme Color Tokens (Clean Industrial Engineering / Charcoal & Titanium - Solid colors, No gradients, No AI blues/purples) */
+            --bg-base: #111215;
+            --bg-surface: #16171b;
+            --bg-card: #1c1d22;
+            --bg-card-hover: #23252c;
+            --bg-input: #121316;
+            
+            --border-subtle: #262830;
+            --border-light: #363944;
+            --border-active: #d4d4d8;
+
+            --text-main: #f4f4f5;
+            --text-secondary: #a1a1aa;
+            --text-tertiary: #71717a;
+
+            /* Physics Vector Specific Colors */
+            --vec-vt: #10b981;      /* Tangential Velocity (Emerald Green) */
+            --vec-ac: #f59e0b;      /* Centripetal Acceleration (Safety Amber) */
+            --vec-fc: #ef4444;      /* Centripetal Force (Warning Red) */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100vh;
+            max-height: 100vh;
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            background: var(--bg-base);
+            color: var(--text-main);
+        }
+
+        .app-container {
+            width: 100vw;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            overflow: hidden;
+            background: var(--bg-base);
+        }
+
+        /* ===== SIDEBAR PANEL ===== */
+        .side-panel {
+            background: #141519;
+            border-right: 1px solid var(--border-subtle);
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 12px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-sizing: border-box;
+            z-index: 20;
+            box-shadow: 4px 0 16px rgba(0, 0, 0, 0.4);
+        }
+
+        .side-panel::-webkit-scrollbar { width: 3px; }
+        .side-panel::-webkit-scrollbar-track { background: transparent; }
+        .side-panel::-webkit-scrollbar-thumb { background: #272830; border-radius: 2px; }
+
+        /* Panel Sections (Solid cards, zero gradients) */
+        .panel-section {
+            background: var(--bg-card);
+            border-radius: 8px;
+            padding: 9px 11px;
+            border: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+            transition: border-color 0.15s ease;
+        }
+
+        .panel-section:hover {
+            border-color: var(--border-light);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 7px;
+        }
+
+        .section-icon-wrap {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #24262e;
+            border: 1px solid #323540;
+            color: var(--text-secondary);
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+        }
+
+        /* 1. Control Button (Solid colors, zero gradients) */
+        .play-btn {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 7px;
+            border: 1px solid #22c55e;
+            background: #16a34a;
+            color: #ffffff;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .play-btn:hover {
+            background: #15803d;
+            border-color: #4ade80;
+        }
+
+        .play-btn:active {
+            transform: translateY(1px);
+        }
+
+        .play-btn.playing {
+            border-color: #ef4444;
+            background: #dc2626;
+            color: #ffffff;
+        }
+
+        .play-btn.playing:hover {
+            background: #b91c1c;
+            border-color: #f87171;
+        }
+
+        .btn-svg-icon {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+
+        /* 2. Interactive Parameters (Sliders) */
+        .param-group {
+            margin-bottom: 7px;
+        }
+
+        .param-group:last-of-type {
+            margin-bottom: 5px;
+        }
+
+        .param-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 3px;
+        }
+
+        .param-title {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .param-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            color: var(--text-main);
+            background: #141519;
+            border: 1px solid var(--border-subtle);
+            padding: 1px 7px;
+            border-radius: 4px;
+        }
+
+        /* Modern Range Input with Solid Neutrals */
+        .slider-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: #272830;
+            outline: none;
+            cursor: pointer;
+            display: block;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #f4f4f5;
+            border: 2px solid #52525b;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+            transition: transform 0.12s ease, border-color 0.12s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            border-color: #d4d4d8;
+            background: #ffffff;
+        }
+
+        /* Segmented Presets Control */
+        .presets-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-top: 7px;
+            padding-top: 7px;
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        .preset-btn {
+            padding: 5px 3px;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+            background: #16171b;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1px;
+        }
+
+        .preset-btn span.tag {
+            font-size: 8.5px;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+        }
+
+        .preset-btn:hover {
+            border-color: var(--border-light);
+            color: var(--text-main);
+            background: #222329;
+        }
+
+        .preset-btn.active {
+            border-color: #d4d4d8;
+            background: #282a32;
+            color: #ffffff;
+        }
+
+        .preset-btn.active span.tag {
+            color: #a1a1aa;
+        }
+
+        /* 3. Vectors Switch Toggles */
+        .vector-toggles {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .vector-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 9px;
+            border-radius: 7px;
+            border: 1px solid var(--border-subtle);
+            background: #16171b;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .vector-toggle:hover {
+            border-color: var(--border-light);
+            background: #202228;
+        }
+
+        .toggle-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .toggle-dot.vt { background: var(--vec-vt); }
+        .toggle-dot.ac { background: var(--vec-ac); }
+        .toggle-dot.fc { background: var(--vec-fc); }
+
+        .toggle-label {
+            font-size: 10.5px;
+            font-weight: 500;
+            color: var(--text-main);
+            line-height: 1.2;
+        }
+
+        .toggle-desc {
+            font-size: 8.5px;
+            color: var(--text-tertiary);
+            display: block;
+        }
+
+        /* Micro Switch */
+        .toggle-switch {
+            width: 28px;
+            height: 16px;
+            border-radius: 8px;
+            background: #272830;
+            position: relative;
+            transition: background 0.15s ease;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #71717a;
+            transition: all 0.15s ease;
+        }
+
+        .vector-toggle.active .toggle-switch {
+            background: #16a34a;
+        }
+
+        .vector-toggle.active .toggle-switch::after {
+            left: 14px;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
+        /* 4. Real-time Results Cards - Perfectly Symmetrical 2x3 Grid */
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+        }
+
+        .result-card {
+            background: #16171b;
+            border-radius: 7px;
+            padding: 6px 8px;
+            border: 1px solid var(--border-subtle);
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .result-card:hover {
+            border-color: var(--border-light);
+            background: #202228;
+        }
+
+        .result-card .label {
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-tertiary);
+            margin-bottom: 3px;
+            display: block;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .result-card .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: baseline;
+            white-space: nowrap;
+        }
+
+        .result-card .unit {
+            font-size: 9px;
+            font-weight: 400;
+            color: var(--text-tertiary);
+            margin-left: 3px;
+        }
+
+        .result-card.freq .value { color: #f4f4f5; }
+        .result-card.period .value { color: #fbbf24; }  /* Warm amber, NO purple */
+        .result-card.omega .value { color: #e4e4e7; }   /* Platinum, NO cyan/blue */
+        .result-card.vel .value { color: var(--vec-vt); } /* Emerald #10b981 */
+        .result-card.acc .value { color: var(--vec-ac); } /* Amber #f59e0b */
+        .result-card.force .value { color: var(--vec-fc); } /* Red #ef4444 */
+
+        /* ===== MAIN 3D VIEWPORT ===== */
+        .main-viewport {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+            background: #111215;
+        }
+
+        #webgl-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Projected 3D Labels (Floating Badges, zero gradients, solid dark) */
+        .badge-3d {
+            position: absolute;
+            pointer-events: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 5px;
+            background: #141519;
+            border: 1px solid;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.15s ease;
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+            letter-spacing: -0.01em;
+        }
+
+        .badge-3d.mass { color: #f4f4f5; border-color: #52525b; }
+        .badge-3d.vt { color: var(--vec-vt); border-color: var(--vec-vt); }
+        .badge-3d.ac { color: var(--vec-ac); border-color: var(--vec-ac); }
+        .badge-3d.fc { color: var(--vec-fc); border-color: var(--vec-fc); }
+        .badge-3d.rad { color: #a1a1aa; border-color: #3f3f46; }
+
+        /* Top Bar inside 3D Viewport */
+        .viewport-topbar {
+            position: absolute;
+            top: 14px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .vector-legend {
+            display: flex;
+            gap: 6px;
+            pointer-events: auto;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            background: #16171b;
+            border: 1px solid var(--border-subtle);
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+
+        .legend-line {
+            width: 14px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .legend-line.vt { background: var(--vec-vt); }
+        .legend-line.ac { background: var(--vec-ac); }
+        .legend-line.fc { background: var(--vec-fc); }
+
+        .hud-overlay {
+            display: flex;
+            gap: 6px;
+        }
+
+        .hud-chip {
+            padding: 5px 12px;
+            border-radius: 6px;
+            background: #16171b;
+            border: 1px solid var(--border-subtle);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- SIDE PANEL -->
+    <aside class="side-panel">
+        <!-- 1. Playback Control -->
+        <div class="panel-section">
+            <div class="section-header">
+                <div class="section-icon-wrap">
+                    <svg class="btn-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                </div>
+                <span class="section-title">Control de Giro</span>
+            </div>
+            <button class="play-btn" id="playBtn" onclick="togglePlay()">
+                <svg id="playIconSvg" class="btn-svg-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span id="playText">Iniciar Simulación</span>
+            </button>
+        </div>
+
+        <!-- 2. Interactive Parameters -->
+        <div class="panel-section">
+            <div class="section-header">
+                <div class="section-icon-wrap">
+                    <svg class="btn-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </div>
+                <span class="section-title">Parámetros del Sistema</span>
+            </div>
+
+            <!-- RPM Slider -->
+            <div class="param-group">
+                <div class="param-label">
+                    <span class="param-title">Velocidad de rotación (n)</span>
+                    <span class="param-value" id="rpmDisplay">10.0 rpm</span>
+                </div>
+                <div class="slider-wrapper">
+                    <input type="range" id="rpmSlider" min="0" max="25" step="0.5" value="10" oninput="updateParams()">
+                </div>
+            </div>
+
+            <!-- Radius Slider -->
+            <div class="param-group">
+                <div class="param-label">
+                    <span class="param-title">Radio del aspa (r)</span>
+                    <span class="param-value" id="radiusDisplay">35 m</span>
+                </div>
+                <div class="slider-wrapper">
+                    <input type="range" id="radiusSlider" min="5" max="70" step="1" value="35" oninput="updateParams()">
+                </div>
+            </div>
+
+            <!-- Mass Slider -->
+            <div class="param-group">
+                <div class="param-label">
+                    <span class="param-title">Masa puntual (m)</span>
+                    <span class="param-value" id="massDisplay">100 kg</span>
+                </div>
+                <div class="slider-wrapper">
+                    <input type="range" id="massSlider" min="10" max="500" step="5" value="100" oninput="updateParams()">
+                </div>
+            </div>
+
+            <!-- Direct Study Case Presets -->
+            <div class="presets-row">
+                <button class="preset-btn" id="preset8" onclick="setPreset(8)">
+                    <span class="tag">Caso 1</span>
+                    <strong>8 rpm</strong>
+                </button>
+                <button class="preset-btn active" id="preset10" onclick="setPreset(10)">
+                    <span class="tag">Caso 2</span>
+                    <strong>10 rpm</strong>
+                </button>
+                <button class="preset-btn" id="preset12" onclick="setPreset(12)">
+                    <span class="tag">Caso 3</span>
+                    <strong>12 rpm</strong>
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. Vectors Display Toggles -->
+        <div class="panel-section">
+            <div class="section-header">
+                <div class="section-icon-wrap">
+                    <svg class="btn-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+                <span class="section-title">Magnitudes Vectoriales</span>
+            </div>
+            <div class="vector-toggles">
+                <div class="vector-toggle active" onclick="toggleVector(this, 'vt')">
+                    <div class="toggle-info">
+                        <div class="toggle-dot vt"></div>
+                        <div>
+                            <span class="toggle-label">v • Velocidad tangencial</span>
+                            <span class="toggle-desc">Tangente a la trayectoria</span>
+                        </div>
+                    </div>
+                    <div class="toggle-switch"></div>
+                </div>
+
+                <div class="vector-toggle active" onclick="toggleVector(this, 'ac')">
+                    <div class="toggle-info">
+                        <div class="toggle-dot ac"></div>
+                        <div>
+                            <span class="toggle-label">ac • Aceleración centrípeta</span>
+                            <span class="toggle-desc">Radial hacia el eje de giro</span>
+                        </div>
+                    </div>
+                    <div class="toggle-switch"></div>
+                </div>
+
+                <div class="vector-toggle active" onclick="toggleVector(this, 'fc')">
+                    <div class="toggle-info">
+                        <div class="toggle-dot fc"></div>
+                        <div>
+                            <span class="toggle-label">Fc • Fuerza centrípeta</span>
+                            <span class="toggle-desc">Tensión radial neta (m · ac)</span>
+                        </div>
+                    </div>
+                    <div class="toggle-switch"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Real-time Numerical Results (Symmetrical 2x3 Grid with Fc perfectly aligned) -->
+        <div class="panel-section">
+            <div class="section-header">
+                <div class="section-icon-wrap">
+                    <svg class="btn-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                </div>
+                <span class="section-title">Telemetría en Vivo</span>
+            </div>
+            <div class="results-grid">
+                <!-- Row 1 -->
+                <div class="result-card freq">
+                    <div class="label">Frecuencia (f)</div>
+                    <div class="value" id="resFreq">0.1667<span class="unit">Hz</span></div>
+                </div>
+                <div class="result-card period">
+                    <div class="label">Período (T)</div>
+                    <div class="value" id="resPeriod">6.00<span class="unit">s</span></div>
+                </div>
+                <!-- Row 2 -->
+                <div class="result-card omega">
+                    <div class="label">Vel. Angular (ω)</div>
+                    <div class="value" id="resOmega">1.0472<span class="unit">rad/s</span></div>
+                </div>
+                <div class="result-card vel">
+                    <div class="label">Vel. Tangencial (v)</div>
+                    <div class="value" id="resVel">36.65<span class="unit">m/s</span></div>
+                </div>
+                <!-- Row 3: Accel and Force side-by-side, perfectly aligned -->
+                <div class="result-card acc">
+                    <div class="label">Acel. Centrípeta (ac)</div>
+                    <div class="value" id="resAcc">38.38<span class="unit">m/s²</span></div>
+                </div>
+                <div class="result-card force">
+                    <div class="label">Fuerza Centrípeta (Fc)</div>
+                    <div class="value" id="resForce">3838.20<span class="unit">N</span></div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN 3D VIEWPORT -->
+    <main class="main-viewport" id="viewport">
+        <canvas id="webgl-canvas"></canvas>
+
+        <!-- Floating 3D Vector & Mass Labels (Projected onto Screen) -->
+        <div class="badge-3d mass" id="badgeMass">m = 100 kg</div>
+        <div class="badge-3d vt" id="badgeVt">v = 36.7 m/s</div>
+        <div class="badge-3d ac" id="badgeAc">ac = 38.4 m/s²</div>
+        <div class="badge-3d fc" id="badgeFc">Fc = 3838 N</div>
+        <div class="badge-3d rad" id="badgeRad">r = 35 m</div>
+
+        <!-- Top Bar inside Viewport (Legend + Real-Time Telemetry HUD) -->
+        <div class="viewport-topbar">
+            <div class="vector-legend">
+                <div class="legend-item" id="legendVt">
+                    <div class="legend-line vt"></div>
+                    <span>v (tangencial)</span>
+                </div>
+                <div class="legend-item" id="legendAc">
+                    <div class="legend-line ac"></div>
+                    <span>ac (centrípeta)</span>
+                </div>
+                <div class="legend-item" id="legendFc">
+                    <div class="legend-line fc"></div>
+                    <span>Fc (centrípeta)</span>
+                </div>
+            </div>
+
+            <div class="hud-overlay">
+                <div class="hud-chip">
+                    <span style="color:var(--text-tertiary)">n =</span>
+                    <span id="hudRpm" style="color:var(--text-main); font-weight:700">10.0 rpm</span>
+                </div>
+                <div class="hud-chip">
+                    <span style="color:var(--text-tertiary)">θ =</span>
+                    <span id="hudAngle" style="color:#f59e0b; font-weight:700">0.0°</span>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+// ===== PHYSICS ENGINE =====
+const physics = {
+    rpm: 10,
+    radius: 35,
+    mass: 100,
+
+    get frequency() { return this.rpm / 60; },
+    get period() { return this.frequency > 0 ? 1 / this.frequency : Infinity; },
+    get omega() { return 2 * Math.PI * this.frequency; },
+    get vTangential() { return this.omega * this.radius; },
+    get aCentripetal() { return this.omega * this.omega * this.radius; },
+    get fCentripetal() { return this.mass * this.aCentripetal; }
+};
+
+// Simulation State
+let isPlaying = false;
+let angle = 0;
+let lastTime = 0;
+let showVt = true, showAc = true, showFc = true;
+
+// DOM Elements
+const rpmSlider = document.getElementById('rpmSlider');
+const radiusSlider = document.getElementById('radiusSlider');
+const massSlider = document.getElementById('massSlider');
+
+function updateParams() {
+    physics.rpm = parseFloat(rpmSlider.value);
+    physics.radius = parseFloat(radiusSlider.value);
+    physics.mass = parseFloat(massSlider.value);
+
+    document.getElementById('rpmDisplay').textContent = physics.rpm.toFixed(1) + ' rpm';
+    document.getElementById('radiusDisplay').textContent = physics.radius + ' m';
+    document.getElementById('massDisplay').textContent = physics.mass + ' kg';
+
+    updateResults();
+    updatePresetHighlight();
+    updateRotorDimensions();
+}
+
+function updateResults() {
+    const f = physics.frequency;
+    const T = physics.period;
+    const w = physics.omega;
+    const v = physics.vTangential;
+    const ac = physics.aCentripetal;
+    const fc = physics.fCentripetal;
+
+    document.getElementById('resFreq').innerHTML = f.toFixed(4) + '<span class="unit">Hz</span>';
+    document.getElementById('resPeriod').innerHTML = (T === Infinity ? '∞' : T.toFixed(2)) + '<span class="unit">s</span>';
+    document.getElementById('resOmega').innerHTML = w.toFixed(4) + '<span class="unit">rad/s</span>';
+    document.getElementById('resVel').innerHTML = v.toFixed(2) + '<span class="unit">m/s</span>';
+    document.getElementById('resAcc').innerHTML = ac.toFixed(2) + '<span class="unit">m/s²</span>';
+    document.getElementById('resForce').innerHTML = fc.toFixed(2) + '<span class="unit">N</span>';
+
+    document.getElementById('hudRpm').textContent = physics.rpm.toFixed(1) + ' rpm';
+}
+
+function updatePresetHighlight() {
+    ['preset8', 'preset10', 'preset12'].forEach(id => {
+        document.getElementById(id).classList.remove('active');
+    });
+    if (physics.rpm === 8 && physics.radius === 35 && physics.mass === 100) {
+        document.getElementById('preset8').classList.add('active');
+    } else if (physics.rpm === 10 && physics.radius === 35 && physics.mass === 100) {
+        document.getElementById('preset10').classList.add('active');
+    } else if (physics.rpm === 12 && physics.radius === 35 && physics.mass === 100) {
+        document.getElementById('preset12').classList.add('active');
+    }
+}
+
+function setPreset(rpm) {
+    rpmSlider.value = rpm;
+    radiusSlider.value = 35;
+    massSlider.value = 100;
+    updateParams();
+}
+
+function togglePlay() {
+    isPlaying = !isPlaying;
+    const btn = document.getElementById('playBtn');
+    const icon = document.getElementById('playIconSvg');
+    const text = document.getElementById('playText');
+    if (isPlaying) {
+        btn.classList.add('playing');
+        icon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+        text.textContent = 'Pausar Rotación';
+        lastTime = performance.now();
+    } else {
+        btn.classList.remove('playing');
+        icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+        text.textContent = 'Iniciar Simulación';
+    }
+}
+
+function toggleVector(el, type) {
+    el.classList.toggle('active');
+    const isActive = el.classList.contains('active');
+    if (type === 'vt') { showVt = isActive; document.getElementById('legendVt').style.display = isActive ? 'flex' : 'none'; }
+    if (type === 'ac') { showAc = isActive; document.getElementById('legendAc').style.display = isActive ? 'flex' : 'none'; }
+    if (type === 'fc') { showFc = isActive; document.getElementById('legendFc').style.display = isActive ? 'flex' : 'none'; }
+}
+
+// ===== THREE.JS 3D SCENE & RENDERING =====
+const viewport = document.getElementById('viewport');
+const canvas = document.getElementById('webgl-canvas');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111215);
+scene.fog = new THREE.FogExp2(0x111215, 0.0025);
+
+const camera = new THREE.PerspectiveCamera(38, viewport.clientWidth / viewport.clientHeight, 1, 1000);
+// Camera positioning for 100% full turbine visibility
+const defaultCamPos = new THREE.Vector3(50, 52, 135);
+const defaultTarget = new THREE.Vector3(0, 44, 0);
+camera.position.copy(defaultCamPos);
+
+const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+// OrbitControls (full 360° mouse navigation)
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.copy(defaultTarget);
+controls.maxPolarAngle = Math.PI / 2 - 0.01;
+controls.minDistance = 25;
+controls.maxDistance = 350;
+
+// Lighting Setup (Neutral white daylight, no blues)
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x27272a, 0.7);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+sunLight.position.set(70, 120, 60);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 10;
+sunLight.shadow.camera.far = 250;
+const d = 60;
+sunLight.shadow.camera.left = -d;
+sunLight.shadow.camera.right = d;
+sunLight.shadow.camera.top = d;
+sunLight.shadow.camera.bottom = -d;
+sunLight.shadow.bias = -0.0005;
+scene.add(sunLight);
+
+const fillLight = new THREE.DirectionalLight(0xe4e4e7, 0.3);
+fillLight.position.set(-60, 40, -40);
+scene.add(fillLight);
+
+// Solid Graphite Ground & Grid
+const groundGeo = new THREE.PlaneGeometry(600, 600, 32, 32);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x16171b, roughness: 0.9, metalness: 0.05 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const gridHelper = new THREE.PolarGridHelper(120, 12, 8, 64, 0x2e3038, 0x1c1d22);
+gridHelper.position.y = 0.05;
+scene.add(gridHelper);
+
+// Foundation Base
+const foundationGeo = new THREE.CylinderGeometry(5.5, 6.5, 1.2, 32);
+const foundationMat = new THREE.MeshStandardMaterial({ color: 0x24262c, roughness: 0.8, metalness: 0.1 });
+const foundation = new THREE.Mesh(foundationGeo, foundationMat);
+foundation.position.y = 0.6;
+foundation.receiveShadow = true;
+foundation.castShadow = true;
+scene.add(foundation);
+
+// ===== 3D AEROGENERATOR MODEL =====
+const turbineGroup = new THREE.Group();
+scene.add(turbineGroup);
+
+const HUB_HEIGHT = 50;
+
+// Tower
+const towerGeo = new THREE.CylinderGeometry(1.6, 3.2, HUB_HEIGHT - 1.2, 32);
+const towerMat = new THREE.MeshStandardMaterial({ color: 0xd4d4d8, roughness: 0.35, metalness: 0.25 });
+const tower = new THREE.Mesh(towerGeo, towerMat);
+tower.position.y = (HUB_HEIGHT + 1.2) / 2;
+tower.castShadow = true;
+tower.receiveShadow = true;
+turbineGroup.add(tower);
+
+[15, 30, 45].forEach(y => {
+    const ringGeo = new THREE.TorusGeometry(1.6 + (1 - y / HUB_HEIGHT) * 1.5, 0.08, 8, 32);
+    const ringMat = new THREE.MeshStandardMaterial({ color: 0x71717a, roughness: 0.4 });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = y;
+    turbineGroup.add(ring);
+});
+
+const doorGeo = new THREE.BoxGeometry(0.8, 2.2, 0.4);
+const doorMat = new THREE.MeshStandardMaterial({ color: 0x18191d, roughness: 0.5 });
+const door = new THREE.Mesh(doorGeo, doorMat);
+door.position.set(0, 2.2, 3.1);
+turbineGroup.add(door);
+
+// Nacelle
+const nacelleGroup = new THREE.Group();
+nacelleGroup.position.set(0, HUB_HEIGHT, 0);
+turbineGroup.add(nacelleGroup);
+
+const nacelleMainGeo = new THREE.BoxGeometry(3.6, 3.2, 8.5);
+const nacelleMat = new THREE.MeshStandardMaterial({ color: 0xe4e4e7, roughness: 0.3, metalness: 0.2 });
+const nacelleMain = new THREE.Mesh(nacelleMainGeo, nacelleMat);
+nacelleMain.position.set(0, 0.4, -1.8);
+nacelleMain.castShadow = true;
+nacelleGroup.add(nacelleMain);
+
+const nacelleCapGeo = new THREE.CylinderGeometry(1.6, 1.6, 3.6, 16);
+const nacelleCap = new THREE.Mesh(nacelleCapGeo, nacelleMat);
+nacelleCap.rotation.z = Math.PI / 2;
+nacelleCap.position.set(0, 0.4, -6.0);
+nacelleGroup.add(nacelleCap);
+
+// Hub & Spinner
+const rotorGroup = new THREE.Group();
+rotorGroup.position.set(0, HUB_HEIGHT, 2.6);
+turbineGroup.add(rotorGroup);
+
+const coneGeo = new THREE.ConeGeometry(1.8, 3.2, 32);
+const coneMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f5, roughness: 0.25, metalness: 0.2 });
+const cone = new THREE.Mesh(coneGeo, coneMat);
+cone.rotation.x = Math.PI / 2;
+cone.position.z = 1.6;
+cone.castShadow = true;
+rotorGroup.add(cone);
+
+const hubDotGeo = new THREE.SphereGeometry(0.35, 16, 16);
+const hubDotMat = new THREE.MeshBasicMaterial({ color: 0xd4d4d8 });
+const hubDot = new THREE.Mesh(hubDotGeo, hubDotMat);
+hubDot.position.z = 3.25;
+rotorGroup.add(hubDot);
+
+// Blades Group
+const bladesGroup = new THREE.Group();
+rotorGroup.add(bladesGroup);
+
+function create3DBlade(length) {
+    const blade = new THREE.Group();
+
+    const rootGeo = new THREE.CylinderGeometry(0.55, 0.65, 2.5, 16);
+    const rootMat = new THREE.MeshStandardMaterial({ color: 0x71717a, roughness: 0.5 });
+    const root = new THREE.Mesh(rootGeo, rootMat);
+    root.position.y = 1.25;
+    blade.add(root);
+
+    const segments = 24;
+    const vertices = [];
+    const indices = [];
+
+    const profile = [
+        [0.0, 0.0], [0.1, 0.25], [0.25, 0.45], [0.5, 0.5],
+        [0.75, 0.35], [0.9, 0.15], [1.0, 0.0], [0.9, -0.05],
+        [0.75, -0.15], [0.5, -0.2], [0.25, -0.18], [0.1, -0.1]
+    ];
+
+    for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const y = 2.0 + t * (length - 2.0);
+        const chord = 2.4 * Math.sin(t * Math.PI * 0.7 + 0.3) * (1 - t * 0.7);
+        const thick = chord * (0.35 - t * 0.22);
+        const twist = (1 - t) * 0.22;
+
+        for (let p = 0; p < profile.length; p++) {
+            const px = (profile[p][0] - 0.3) * chord;
+            const pz = profile[p][1] * thick;
+            const rx = px * Math.cos(twist) - pz * Math.sin(twist);
+            const rz = px * Math.sin(twist) + pz * Math.cos(twist);
+            vertices.push(rx, y, rz);
+        }
+    }
+
+    const nP = profile.length;
+    for (let i = 0; i < segments; i++) {
+        for (let p = 0; p < nP; p++) {
+            const nextP = (p + 1) % nP;
+            const cur = i * nP + p;
+            const next = i * nP + nextP;
+            const aboveCur = (i + 1) * nP + p;
+            const aboveNext = (i + 1) * nP + nextP;
+
+            indices.push(cur, next, aboveCur);
+            indices.push(next, aboveNext, aboveCur);
+        }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshStandardMaterial({
+        color: 0xf4f4f5,
+        roughness: 0.3,
+        metalness: 0.15,
+        side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    blade.add(mesh);
+
+    const tipBandGeo = new THREE.CylinderGeometry(0.18, 0.28, length * 0.1, 8);
+    const tipBandMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.3 });
+    const tipBand = new THREE.Mesh(tipBandGeo, tipBandMat);
+    tipBand.position.y = length * 0.95;
+    blade.add(tipBand);
+
+    return blade;
+}
+
+const blades = [];
+for (let i = 0; i < 3; i++) {
+    const blade = create3DBlade(physics.radius);
+    blade.rotation.z = i * (Math.PI * 2 / 3);
+    bladesGroup.add(blade);
+    blades.push(blade);
+}
+
+// 3D Circular Trajectory Ring (Subtle zinc guide, no blue)
+let trajectoryRing;
+function updateTrajectoryRing() {
+    if (trajectoryRing) rotorGroup.remove(trajectoryRing);
+    const ringGeo = new THREE.RingGeometry(physics.radius - 0.15, physics.radius + 0.15, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+        color: 0x52525b,
+        transparent: true,
+        opacity: 0.45,
+        side: THREE.DoubleSide
+    });
+    trajectoryRing = new THREE.Mesh(ringGeo, ringMat);
+    trajectoryRing.position.z = 0.1;
+    rotorGroup.add(trajectoryRing);
+}
+updateTrajectoryRing();
+
+// Tip Mass Sphere (Warning red beacon at the tip)
+const tipMassGeo = new THREE.SphereGeometry(0.85, 24, 24);
+const tipMassMat = new THREE.MeshStandardMaterial({
+    color: 0xef4444,
+    emissive: 0x7f1d1d,
+    emissiveIntensity: 0.5,
+    roughness: 0.2,
+    metalness: 0.3
+});
+const tipMass = new THREE.Mesh(tipMassGeo, tipMassMat);
+tipMass.position.set(0, physics.radius, 0.4);
+blades[0].add(tipMass);
+
+const tipLight = new THREE.PointLight(0xef4444, 0.8, 12);
+tipMass.add(tipLight);
+
+// 3D Physical Vector Arrows
+function create3DArrow(colorHex) {
+    const group = new THREE.Group();
+
+    const shaftGeo = new THREE.CylinderGeometry(0.18, 0.18, 1, 16);
+    shaftGeo.translate(0, 0.5, 0);
+    const shaftMat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.35,
+        roughness: 0.3
+    });
+    const shaft = new THREE.Mesh(shaftGeo, shaftMat);
+    group.add(shaft);
+
+    const headGeo = new THREE.ConeGeometry(0.55, 1.8, 16);
+    headGeo.translate(0, 0.9, 0);
+    const headMat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.6
+    });
+    const head = new THREE.Mesh(headGeo, headMat);
+    group.add(head);
+
+    return { group, shaft, head };
+}
+
+const arrowVt = create3DArrow(0x10b981);
+const arrowAc = create3DArrow(0xf59e0b);
+const arrowFc = create3DArrow(0xef4444);
+
+blades[0].add(arrowVt.group);
+blades[0].add(arrowAc.group);
+blades[0].add(arrowFc.group);
+
+const bladeRadiusMarker = new THREE.Object3D();
+bladeRadiusMarker.position.set(1.5, physics.radius * 0.5, 0.4);
+blades[0].add(bladeRadiusMarker);
+
+// 3D Neutral Wind Streaks
+const windCount = 80;
+const windGeo = new THREE.BufferGeometry();
+const windPositions = new Float32Array(windCount * 6);
+const windSpeeds = [];
+
+for (let i = 0; i < windCount; i++) {
+    const x = (Math.random() - 0.5) * 110;
+    const y = 5 + Math.random() * 85;
+    const z = -60 + Math.random() * 120;
+    const len = 4 + Math.random() * 8;
+
+    windPositions[i * 6] = x;
+    windPositions[i * 6 + 1] = y;
+    windPositions[i * 6 + 2] = z;
+    windPositions[i * 6 + 3] = x;
+    windPositions[i * 6 + 4] = y;
+    windPositions[i * 6 + 5] = z + len;
+
+    windSpeeds.push(0.8 + Math.random() * 1.5);
+}
+
+windGeo.setAttribute('position', new THREE.BufferAttribute(windPositions, 3));
+const windMat = new THREE.LineBasicMaterial({ color: 0x71717a, transparent: true, opacity: 0.25 });
+const windLines = new THREE.LineSegments(windGeo, windMat);
+scene.add(windLines);
+
+function updateRotorDimensions() {
+    updateTrajectoryRing();
+    const scaleFactor = physics.radius / 35;
+    blades.forEach(b => b.scale.set(1, scaleFactor, 1));
+    tipMass.position.set(0, physics.radius, 0.4);
+    if (bladeRadiusMarker) {
+        bladeRadiusMarker.position.set(1.5, physics.radius * 0.5, 0.4);
+    }
+}
+
+function updateVectorPositions() {
+    const r = physics.radius;
+    const tipPos = new THREE.Vector3(0, r, 0.4);
+    const maxArrowLen = Math.min(r * 0.45, 18);
+
+    arrowVt.group.visible = showVt;
+    if (showVt) {
+        const vtLen = Math.min((physics.vTangential / 45) * maxArrowLen, maxArrowLen);
+        arrowVt.group.position.copy(tipPos);
+        arrowVt.group.rotation.set(0, 0, -Math.PI / 2);
+        arrowVt.shaft.scale.set(1, vtLen, 1);
+        arrowVt.head.position.set(0, vtLen, 0);
+    }
+
+    arrowAc.group.visible = showAc;
+    if (showAc) {
+        const acLen = Math.min((physics.aCentripetal / 55) * maxArrowLen, maxArrowLen);
+        arrowAc.group.position.set(0, r, 1.2);
+        arrowAc.group.rotation.set(0, 0, Math.PI);
+        arrowAc.shaft.scale.set(1, acLen, 1);
+        arrowAc.head.position.set(0, acLen, 0);
+    }
+
+    arrowFc.group.visible = showFc;
+    if (showFc) {
+        const fcLen = Math.min((physics.fCentripetal / 5500) * maxArrowLen, maxArrowLen);
+        arrowFc.group.position.set(0, r, -0.4);
+        arrowFc.group.rotation.set(0, 0, Math.PI);
+        arrowFc.shaft.scale.set(1, fcLen, 1);
+        arrowFc.head.position.set(0, fcLen, 0);
+    }
+}
+
+// Projected 3D Badges
+const badgeMass = document.getElementById('badgeMass');
+const badgeVt = document.getElementById('badgeVt');
+const badgeAc = document.getElementById('badgeAc');
+const badgeFc = document.getElementById('badgeFc');
+const badgeRad = document.getElementById('badgeRad');
+const tempVec = new THREE.Vector3();
+
+function projectToScreen(worldPos, el, labelText, offsetX = 0, offsetY = 0) {
+    tempVec.copy(worldPos);
+    tempVec.project(camera);
+
+    if (tempVec.z > 1) {
+        el.style.display = 'none';
+        return;
+    }
+
+    const x = (tempVec.x * 0.5 + 0.5) * viewport.clientWidth + offsetX;
+    const y = (-tempVec.y * 0.5 + 0.5) * viewport.clientHeight + offsetY;
+
+    el.textContent = labelText;
+    el.style.display = 'block';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+}
+
+function updateScreenBadges() {
+    const tipWorld = new THREE.Vector3();
+    tipMass.getWorldPosition(tipWorld);
+
+    // 1. Mass Badge
+    const massPos = tipWorld.clone().add(new THREE.Vector3(0, 1.8, 0));
+    projectToScreen(massPos, badgeMass, `m = ${physics.mass} kg`, 0, -8);
+
+    // 2. Tangential velocity badge
+    if (showVt) {
+        const vtHeadWorld = new THREE.Vector3();
+        arrowVt.head.getWorldPosition(vtHeadWorld);
+        projectToScreen(vtHeadWorld, badgeVt, `v = ${physics.vTangential.toFixed(1)} m/s`, 12, -12);
+    } else {
+        badgeVt.style.display = 'none';
+    }
+
+    // 3. Centripetal acceleration badge
+    if (showAc) {
+        const acHeadWorld = new THREE.Vector3();
+        arrowAc.head.getWorldPosition(acHeadWorld);
+        projectToScreen(acHeadWorld, badgeAc, `ac = ${physics.aCentripetal.toFixed(1)} m/s²`, -46, 0);
+    } else {
+        badgeAc.style.display = 'none';
+    }
+
+    // 4. Centripetal force badge
+    if (showFc) {
+        const fcHeadWorld = new THREE.Vector3();
+        arrowFc.head.getWorldPosition(fcHeadWorld);
+        projectToScreen(fcHeadWorld, badgeFc, `Fc = ${physics.fCentripetal.toFixed(0)} N`, 46, 0);
+    } else {
+        badgeFc.style.display = 'none';
+    }
+
+    // 5. Radius badge
+    if (bladeRadiusMarker) {
+        const radWorld = new THREE.Vector3();
+        bladeRadiusMarker.getWorldPosition(radWorld);
+        projectToScreen(radWorld, badgeRad, `r = ${physics.radius} m`, 0, 0);
+    }
+}
+
+// Window resize
+window.addEventListener('resize', () => {
+    const w = viewport.clientWidth;
+    const h = viewport.clientHeight;
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+});
+
+// Animation Loop
+function animate(timestamp) {
+    requestAnimationFrame(animate);
+
+    if (isPlaying && lastTime > 0) {
+        const dt = (timestamp - lastTime) / 1000;
+        angle += physics.omega * dt;
+        bladesGroup.rotation.z = angle;
+    }
+    lastTime = timestamp;
+
+    const angleDeg = ((angle * 180 / Math.PI) % 360 + 360) % 360;
+    document.getElementById('hudAngle').textContent = angleDeg.toFixed(1) + '°';
+
+    // Wind animation
+    const pos = windLines.geometry.attributes.position.array;
+    for (let i = 0; i < windCount; i++) {
+        pos[i * 6 + 2] += windSpeeds[i];
+        pos[i * 6 + 5] += windSpeeds[i];
+        if (pos[i * 6 + 2] > 60) {
+            pos[i * 6 + 2] = -60;
+            pos[i * 6 + 5] = -60 + (pos[i * 6 + 5] - pos[i * 6 + 2]);
+        }
+    }
+    windLines.geometry.attributes.position.needsUpdate = true;
+
+    updateVectorPositions();
+    controls.update();
+    renderer.render(scene, camera);
+    updateScreenBadges();
+}
+
+// Start
+function init() {
+    updateParams();
+    updateVectorPositions();
+    requestAnimationFrame(animate);
+}
+
+init();
+</script>
+
+</body>
+</html>
