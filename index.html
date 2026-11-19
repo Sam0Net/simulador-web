@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Simulador de Aerogenerador 3D</title>
     <!-- Three.js and OrbitControls (Local offline copies) -->
     <script src="three.min.js"></script>
@@ -39,12 +39,15 @@
             box-sizing: border-box;
             user-select: none;
             -webkit-font-smoothing: antialiased;
+            -webkit-tap-highlight-color: transparent;
         }
 
         html, body {
             width: 100%;
             height: 100vh;
+            height: 100dvh;
             max-height: 100vh;
+            max-height: 100dvh;
             overflow: hidden;
             font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
             background: var(--bg-base);
@@ -54,10 +57,25 @@
         .app-container {
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             display: grid;
             grid-template-columns: 340px 1fr;
             overflow: hidden;
             background: var(--bg-base);
+            position: relative;
+            transition: grid-template-columns 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Desktop Collapsed Sidebar State */
+        .app-container.collapsed {
+            grid-template-columns: 0px 1fr;
+        }
+
+        .app-container.collapsed .side-panel {
+            transform: translateX(-100%);
+            opacity: 0;
+            pointer-events: none;
+            border-right-color: transparent;
         }
 
         /* ===== SIDEBAR PANEL ===== */
@@ -65,20 +83,77 @@
             background: #141519;
             border-right: 1px solid var(--border-subtle);
             height: 100vh;
+            height: 100dvh;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 12px 10px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             gap: 8px;
             box-sizing: border-box;
-            z-index: 20;
+            z-index: 40;
             box-shadow: 4px 0 16px rgba(0, 0, 0, 0.4);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
         }
 
         .side-panel::-webkit-scrollbar { width: 3px; }
         .side-panel::-webkit-scrollbar-track { background: transparent; }
         .side-panel::-webkit-scrollbar-thumb { background: #272830; border-radius: 2px; }
+
+        /* Panel Top Bar with Brand & Collapse Trigger */
+        .panel-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2px 4px 6px 4px;
+            border-bottom: 1px solid var(--border-subtle);
+            flex-shrink: 0;
+        }
+
+        .panel-brand {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .panel-brand-icon {
+            width: 15px;
+            height: 15px;
+            color: #d4d4d8;
+        }
+
+        .panel-brand-title {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: #f4f4f5;
+        }
+
+        .panel-collapse-trigger {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
+            background: #1c1d22;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+
+        .panel-collapse-trigger:hover {
+            background: #272830;
+            border-color: var(--border-light);
+            color: #ffffff;
+        }
+
+        .panel-collapse-trigger svg {
+            width: 14px;
+            height: 14px;
+        }
 
         /* Panel Sections (Solid cards, zero gradients) */
         .panel-section {
@@ -138,7 +213,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 10px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
         }
 
@@ -442,6 +517,7 @@
             position: relative;
             width: 100%;
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
             background: #111215;
         }
@@ -450,6 +526,7 @@
             width: 100%;
             height: 100%;
             display: block;
+            touch-action: none;
         }
 
         /* Projected 3D Labels (Floating Badges, zero gradients, solid dark) */
@@ -488,7 +565,53 @@
             align-items: center;
             gap: 10px;
             pointer-events: none;
-            z-index: 15;
+            z-index: 25;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: auto;
+        }
+
+        /* Toggle Panel Button (Always accessible) */
+        .toggle-panel-btn {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: #16171b;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+            transition: all 0.15s ease;
+            pointer-events: auto;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .toggle-panel-btn:hover {
+            border-color: var(--border-light);
+            background: #202228;
+            color: #ffffff;
+        }
+
+        .toggle-panel-btn.active {
+            border-color: #d4d4d8;
+            background: #262832;
+            color: #ffffff;
+        }
+
+        .toggle-panel-btn svg {
+            width: 15px;
+            height: 15px;
+            flex-shrink: 0;
         }
 
         .vector-legend {
@@ -524,6 +647,7 @@
         .hud-overlay {
             display: flex;
             gap: 6px;
+            pointer-events: auto;
         }
 
         .hud-chip {
@@ -539,13 +663,170 @@
             gap: 6px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
         }
+
+        /* Mobile Drawer Backdrop */
+        .drawer-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            z-index: 35;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        /* ====================================================
+           MOBILE RESPONSIVE BREAKPOINTS (<= 768px & <= 540px)
+           ==================================================== */
+        @media (max-width: 768px) {
+            .app-container {
+                display: block;
+                position: relative;
+                grid-template-columns: none;
+            }
+
+            .main-viewport {
+                position: absolute;
+                inset: 0;
+                width: 100vw;
+                height: 100vh;
+                height: 100dvh;
+            }
+
+            .drawer-backdrop {
+                display: block;
+            }
+
+            .drawer-backdrop.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            .side-panel {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: min(340px, 86vw);
+                max-width: 360px;
+                height: 100vh;
+                height: 100dvh;
+                z-index: 50;
+                transform: translateX(-100%);
+                box-shadow: none;
+                padding: 12px 10px;
+                gap: 8px;
+            }
+
+            .side-panel.open {
+                transform: translateX(0);
+                box-shadow: 12px 0 35px rgba(0, 0, 0, 0.85);
+            }
+
+            .panel-top-row {
+                padding-bottom: 6px;
+            }
+
+            .panel-collapse-trigger {
+                width: 34px;
+                height: 34px;
+            }
+
+            /* Touch target sizes */
+            .toggle-panel-btn {
+                padding: 7px 12px;
+                font-size: 12px;
+                min-height: 38px;
+            }
+
+            input[type="range"] {
+                height: 6px;
+            }
+
+            input[type="range"]::-webkit-slider-thumb {
+                width: 20px;
+                height: 20px;
+            }
+
+            .preset-btn {
+                padding: 7px 3px;
+                font-size: 12px;
+            }
+
+            .vector-toggle {
+                padding: 7px 10px;
+            }
+
+            .toggle-switch {
+                width: 32px;
+                height: 18px;
+            }
+
+            .toggle-switch::after {
+                width: 14px;
+                height: 14px;
+            }
+
+            .vector-toggle.active .toggle-switch::after {
+                left: 16px;
+            }
+
+            .viewport-topbar {
+                top: 10px;
+                left: 10px;
+                right: 10px;
+                gap: 6px;
+            }
+
+            .hud-chip {
+                padding: 5px 9px;
+                font-size: 10.5px;
+            }
+
+            .badge-3d {
+                font-size: 10px;
+                padding: 2px 6px;
+            }
+        }
+
+        /* Portrait Phone Breakpoint (<= 540px) */
+        @media (max-width: 540px) {
+            .vector-legend {
+                display: none; /* Hide redundant topbar legend on small phone screens */
+            }
+
+            .side-panel {
+                width: 90vw;
+            }
+        }
     </style>
 </head>
 <body>
 
 <div class="app-container">
+    <!-- Mobile Drawer Backdrop Overlay -->
+    <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeSidebarMobile()"></div>
+
     <!-- SIDE PANEL -->
-    <aside class="side-panel">
+    <aside class="side-panel" id="sidePanel">
+        <!-- Panel Top Row with Close/Collapse Button -->
+        <div class="panel-top-row">
+            <div class="panel-brand">
+                <svg class="panel-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
+                </svg>
+                <span class="panel-brand-title">Panel de Control</span>
+            </div>
+            <button class="panel-collapse-trigger" onclick="toggleSidebar()" title="Ocultar panel" aria-label="Ocultar panel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
         <!-- 1. Playback Control -->
         <div class="panel-section">
             <div class="section-header">
@@ -728,23 +1009,37 @@
         <div class="badge-3d fc" id="badgeFc">Fc = 3838 N</div>
         <div class="badge-3d rad" id="badgeRad">r = 35 m</div>
 
-        <!-- Top Bar inside Viewport (Legend + Real-Time Telemetry HUD) -->
+        <!-- Top Bar inside Viewport (Toggle Button + Legend + Real-Time Telemetry HUD) -->
         <div class="viewport-topbar">
-            <div class="vector-legend">
-                <div class="legend-item" id="legendVt">
-                    <div class="legend-line vt"></div>
-                    <span>v (tangencial)</span>
-                </div>
-                <div class="legend-item" id="legendAc">
-                    <div class="legend-line ac"></div>
-                    <span>ac (centrípeta)</span>
-                </div>
-                <div class="legend-item" id="legendFc">
-                    <div class="legend-line fc"></div>
-                    <span>Fc (centrípeta)</span>
+            <div class="topbar-left">
+                <!-- Toggle Panel Button -->
+                <button id="sidebarToggleBtn" class="toggle-panel-btn" onclick="toggleSidebar()" title="Ocultar panel" aria-label="Ocultar o mostrar panel de control">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                        <path d="M14 9l-3 3 3 3"></path>
+                    </svg>
+                    <span id="toggleBtnText">Ocultar</span>
+                </button>
+
+                <!-- 3D Vector Legend -->
+                <div class="vector-legend">
+                    <div class="legend-item" id="legendVt">
+                        <div class="legend-line vt"></div>
+                        <span>v (tangencial)</span>
+                    </div>
+                    <div class="legend-item" id="legendAc">
+                        <div class="legend-line ac"></div>
+                        <span>ac (centrípeta)</span>
+                    </div>
+                    <div class="legend-item" id="legendFc">
+                        <div class="legend-line fc"></div>
+                        <span>Fc (centrípeta)</span>
+                    </div>
                 </div>
             </div>
 
+            <!-- Angle & RPM Status HUD -->
             <div class="hud-overlay">
                 <div class="hud-chip">
                     <span style="color:var(--text-tertiary)">n =</span>
@@ -779,6 +1074,65 @@ let isPlaying = false;
 let angle = 0;
 let lastTime = 0;
 let showVt = true, showAc = true, showFc = true;
+
+// Responsive Sidebar State
+let isSidebarOpen = window.innerWidth > 768;
+
+function toggleSidebar() {
+    isSidebarOpen = !isSidebarOpen;
+    applySidebarState();
+}
+
+function closeSidebarMobile() {
+    if (window.innerWidth <= 768) {
+        isSidebarOpen = false;
+        applySidebarState();
+    }
+}
+
+function applySidebarState() {
+    const container = document.querySelector('.app-container');
+    const sidePanel = document.getElementById('sidePanel');
+    const backdrop = document.getElementById('drawerBackdrop');
+    const toggleBtn = document.getElementById('sidebarToggleBtn');
+    const toggleText = document.getElementById('toggleBtnText');
+
+    if (window.innerWidth > 768) {
+        // Desktop
+        sidePanel.classList.remove('open');
+        backdrop.classList.remove('active');
+
+        if (isSidebarOpen) {
+            container.classList.remove('collapsed');
+            toggleBtn.classList.remove('active');
+            toggleBtn.setAttribute('title', 'Ocultar panel');
+            if (toggleText) toggleText.textContent = 'Ocultar';
+        } else {
+            container.classList.add('collapsed');
+            toggleBtn.classList.add('active');
+            toggleBtn.setAttribute('title', 'Mostrar panel');
+            if (toggleText) toggleText.textContent = 'Controles';
+        }
+    } else {
+        // Mobile Drawer
+        container.classList.remove('collapsed');
+        if (isSidebarOpen) {
+            sidePanel.classList.add('open');
+            backdrop.classList.add('active');
+            toggleBtn.classList.add('active');
+            if (toggleText) toggleText.textContent = 'Cerrar';
+        } else {
+            sidePanel.classList.remove('open');
+            backdrop.classList.remove('active');
+            toggleBtn.classList.remove('active');
+            if (toggleText) toggleText.textContent = 'Controles';
+        }
+    }
+
+    // Trigger smooth resize for Three.js canvas
+    setTimeout(handleResize, 50);
+    setTimeout(handleResize, 310);
+}
 
 // DOM Elements
 const rpmSlider = document.getElementById('rpmSlider');
@@ -882,7 +1236,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// OrbitControls (full 360° mouse navigation)
+// OrbitControls (full 360° mouse navigation & multi-touch gestures)
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
@@ -1299,13 +1653,22 @@ function updateScreenBadges() {
     }
 }
 
-// Window resize
-window.addEventListener('resize', () => {
+// Window resize handler
+function handleResize() {
     const w = viewport.clientWidth;
     const h = viewport.clientHeight;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
+}
+
+window.addEventListener('resize', () => {
+    // If desktop, sync state
+    if (window.innerWidth <= 768 && isSidebarOpen && !document.getElementById('sidePanel').classList.contains('open')) {
+        isSidebarOpen = false;
+    }
+    applySidebarState();
+    handleResize();
 });
 
 // Animation Loop
@@ -1342,6 +1705,8 @@ function animate(timestamp) {
 
 // Start
 function init() {
+    canvas.style.touchAction = 'none';
+    applySidebarState();
     updateParams();
     updateVectorPositions();
     requestAnimationFrame(animate);
